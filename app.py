@@ -17,7 +17,7 @@ jd_collection = db["job_description"]
 # Set Streamlit page config for wider layout
 st.set_page_config(layout="wide")
 
-# Custom CSS for visual enhancements
+# Custom CSS for consistent styling
 def load_css():
     st.markdown(
         """
@@ -28,6 +28,12 @@ def load_css():
             margin-bottom: 20px;
             border-radius: 10px;
             background-color: #f9f9f9;
+        }
+        .section-heading {
+            border-left: 5px solid #4CAF50;
+            padding-left: 10px;
+            margin-top: 20px;
+            margin-bottom: 10px;
         }
         .styled-table {
             border-collapse: collapse;
@@ -134,7 +140,7 @@ def display_resume_details(resume_id):
 
 # New Feature: Natural Language JD Search
 def natural_language_jd_search():
-    st.title("Natural Language JD Search")
+    st.markdown("<div class='section-heading'>Natural Language JD Search</div>", unsafe_allow_html=True)
     num_candidates = st.number_input(
         "Enter the Number of Resumes to Fetch for JD Search",
         min_value=1,
@@ -225,15 +231,18 @@ natural_language_jd_search()
 
 # Existing Main Functionality
 def main():
-    st.title("Resume and Job Description Matching Dashboard")
-
-    # Metrics
+    # Metrics at the top
+    st.markdown("<div class='metrics-container'>", unsafe_allow_html=True)
     total_jds = jd_collection.count_documents({})
     total_resumes = resume_collection.count_documents({})
-    st.markdown("<div class='metrics-container'>", unsafe_allow_html=True)
-    st.metric(label="Total Resumes", value=total_resumes)
-    st.metric(label="Total Job Descriptions", value=total_jds)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric(label="Total Resumes", value=total_resumes)
+    with col2:
+        st.metric(label="Total Job Descriptions", value=total_jds)
     st.markdown("</div>", unsafe_allow_html=True)
+
+    # Original layout preserved below
 
     col1, col2 = st.columns([1, 2])
     with col1:
