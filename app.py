@@ -88,50 +88,59 @@ def display_resume_details(resume_id):
         st.warning("Resume not found!")
         return
 
-    st.markdown("<div class='section-heading'>Resume Details</div>", unsafe_allow_html=True)
+    # Personal Information
+    st.markdown("<div class='section-heading'>Personal Information</div>", unsafe_allow_html=True)
+    st.write(f"**Name:** {resume.get('Name', 'N/A')}")
+    st.write(f"**Email:** {resume.get('Email', 'N/A')}")
+    st.write(f"**Contact No:** {resume.get('Contact No', 'N/A')}")
+    st.write(f"**Address:** {resume.get('Address', 'N/A')}")
+    st.markdown("---")
 
-    # Educational Qualifications
-    edu_tile = f"<div class='tile'><div class='tile-heading'>Educational Qualifications</div>"
-    educational_qualifications = resume.get("Educational Qualifications", [])
-    if educational_qualifications:
-        for edu in educational_qualifications:
-            edu_tile += f"<p>{edu.get('degree', 'N/A')} in {edu.get('field', 'N/A')} from {edu.get('institution', 'N/A')} ({edu.get('graduationYear', 'N/A')})</p>"
-    else:
-        edu_tile += "<p>No educational qualifications available.</p>"
-    edu_tile += "</div>"
-    st.markdown(edu_tile, unsafe_allow_html=True)
+    # Create a 2x2 grid for the tiles
+    col1, col2 = st.columns(2)
 
-    # Job Experiences
-    job_tile = f"<div class='tile'><div class='tile-heading'>Job Experiences</div>"
-    job_experiences = resume.get("Job Experiences", [])
-    if job_experiences:
-        for job in job_experiences:
-            job_tile += f"<p>{job.get('title', 'N/A')} at {job.get('company', 'N/A')} ({job.get('duration', 'N/A')} years)</p>"
-    else:
-        job_tile += "<p>No job experiences available.</p>"
-    job_tile += "</div>"
-    st.markdown(job_tile, unsafe_allow_html=True)
+    # Tile 1: Educational Qualifications
+    with col1:
+        st.markdown("<div class='tile'><div class='tile-heading'>Educational Qualifications</div>", unsafe_allow_html=True)
+        educational_qualifications = resume.get("Educational Qualifications", [])
+        if educational_qualifications:
+            for edu in educational_qualifications:
+                st.write(f"- {edu.get('degree', 'N/A')} in {edu.get('field', 'N/A')} from {edu.get('institution', 'N/A')} ({edu.get('graduationYear', 'N/A')})")
+        else:
+            st.write("No educational qualifications available.")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    # Skills
-    skill_tile = f"<div class='tile'><div class='tile-heading'>Skills</div>"
-    skills = resume.get("Skills", [])
-    if skills:
-        skill_names = [skill.get("skillName", "N/A") for skill in skills]
-        skill_tile += f"<p>{', '.join(skill_names)}</p>"
-    else:
-        skill_tile += "<p>No skills available.</p>"
-    skill_tile += "</div>"
-    st.markdown(skill_tile, unsafe_allow_html=True)
+    # Tile 2: Job Experiences
+    with col2:
+        st.markdown("<div class='tile'><div class='tile-heading'>Job Experiences</div>", unsafe_allow_html=True)
+        job_experiences = resume.get("Job Experiences", [])
+        if job_experiences:
+            for job in job_experiences:
+                st.write(f"- {job.get('title', 'N/A')} at {job.get('company', 'N/A')} ({job.get('duration', 'N/A')} years)")
+        else:
+            st.write("No job experiences available.")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    # Keywords
-    keyword_tile = f"<div class='tile'><div class='tile-heading'>Keywords</div>"
-    keywords = resume.get("Keywords", [])
-    if keywords:
-        keyword_tile += f"<p>{', '.join(keywords)}</p>"
-    else:
-        keyword_tile += "<p>No keywords available.</p>"
-    keyword_tile += "</div>"
-    st.markdown(keyword_tile, unsafe_allow_html=True)
+    # Tile 3: Skills
+    with col1:
+        st.markdown("<div class='tile'><div class='tile-heading'>Skills</div>", unsafe_allow_html=True)
+        skills = resume.get("Skills", [])
+        if skills:
+            skill_names = [skill.get("skillName", "N/A") for skill in skills]
+            st.write(", ".join(skill_names))
+        else:
+            st.write("No skills available.")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # Tile 4: Keywords
+    with col2:
+        st.markdown("<div class='tile'><div class='tile-heading'>Keywords</div>", unsafe_allow_html=True)
+        keywords = resume.get("Keywords", [])
+        if keywords:
+            st.write(", ".join(keywords))
+        else:
+            st.write("No keywords available.")
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # New Feature: Natural Language JD Addition
 def natural_language_jd_addition():
