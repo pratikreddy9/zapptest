@@ -57,6 +57,48 @@ def load_css():
         unsafe_allow_html=True,
     )
 
+# Function to find top matches using embeddings
+def find_top_matches(jd_embedding, num_candidates=10):
+    results = []
+    resumes = resume_collection.find().limit(num_candidates)
+
+    for resume in resumes:
+        resume_embedding = resume.get("embedding")
+        if not resume_embedding:
+            continue
+
+        similarity_score = sum(
+            a * b for a, b in zip(jd_embedding, resume_embedding)
+        ) / (sum(a * a for a in jd_embedding) ** 0.5 * sum(b * b for b in resume_embedding) ** 0.5)
+        similarity_score = round(similarity_score * 10, 4)
+
+        results.append({
+            "Resume ID": resume.get("resumeId"),
+            "Name": resume.get("name"),
+            "Similarity Score": similarity_score
+        })
+
+    return sorted(results, key=lambda x: x["Similarity Score"], reverse=True)
+
+# Function to display detailed resume data
+def display_resume_details(resume_id):
+    resume = resume_collection.find_one({"resumeId": resume_id})
+    if resume:
+        filtered_data = {
+            "Resume ID": resume.get("resumeId"),
+            "Name": resume.get("name"),
+            "Email": resume.get("email"),
+            "Contact No": resume.get("contactNo"),
+            "Address": resume.get("address"),
+            "Educational Qualifications": resume.get("educationalQualifications"),
+            "Job Experiences": resume.get("jobExperiences"),
+            "Keywords": resume.get("keywords"),
+            "Skills": resume.get("skills"),
+        }
+        st.json(filtered_data)
+    else:
+        st.warning("Resume not found!")
+
 # New Feature: Natural Language JD Addition
 def natural_language_jd_addition():
     st.markdown("<div class='section-heading'>Add a Job Description</div>", unsafe_allow_html=True)
