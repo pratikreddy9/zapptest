@@ -36,21 +36,22 @@ def load_css():
             margin-top: 20px;
             margin-bottom: 10px;
         }
-        .styled-table {
-            border-collapse: collapse;
-            width: 100%;
-            overflow-x: auto;
+        .tile {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px;
+            background-color: #f9f9f9;
+            box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
         }
-        .styled-table th, .styled-table td {
-            text-align: left;
-            padding: 8px;
+        .tile:hover {
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
         }
-        .styled-table th {
-            background-color: #4CAF50;
-            color: white;
-        }
-        .styled-table tr:nth-child(even) {
-            background-color: #f2f2f2;
+        .tile-heading {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
         }
         </style>
         """,
@@ -80,62 +81,57 @@ def find_top_matches(jd_embedding, num_candidates=10):
 
     return sorted(results, key=lambda x: x["Similarity Score"], reverse=True)
 
-# Function to display detailed resume data
-# Function to display detailed resume data
+# Function to display detailed resume data in tiles
 def display_resume_details(resume_id):
     resume = resume_collection.find_one({"resumeId": resume_id})
-    if resume:
-        # Personal Information
-        st.markdown("### Personal Information")
-        st.write(f"**Resume ID:** {resume.get('Resume ID', 'N/A')}")
-        st.write(f"**Name:** {resume.get('Name', 'N/A')}")
-        st.write(f"**Email:** {resume.get('Email', 'N/A')}")
-        st.write(f"**Contact No:** {resume.get('Contact No', 'N/A')}")
-        st.write(f"**Address:** {resume.get('Address', 'N/A')}")
-        st.markdown("---")
-
-        # Educational Qualifications
-        st.markdown("### Educational Qualifications")
-        educational_qualifications = resume.get("Educational Qualifications", [])
-        if educational_qualifications:
-            edu_df = pd.DataFrame(educational_qualifications)
-            edu_df = edu_df.rename(columns={"degree": "Degree", "field": "Field", "graduationYear": "Graduation Year", "institution": "Institution"})
-            st.table(edu_df)
-        else:
-            st.write("No educational qualifications available.")
-        st.markdown("---")
-
-        # Job Experiences
-        st.markdown("### Job Experiences")
-        job_experiences = resume.get("Job Experiences", [])
-        if job_experiences:
-            job_df = pd.DataFrame(job_experiences)
-            job_df = job_df.rename(columns={"title": "Title", "company": "Company", "duration": "Duration (Years)"})
-            st.table(job_df)
-        else:
-            st.write("No job experiences available.")
-        st.markdown("---")
-
-        # Skills
-        st.markdown("### Skills")
-        skills = resume.get("Skills", [])
-        if skills:
-            skill_names = [skill.get("skillName", "N/A") for skill in skills]
-            st.write(", ".join(skill_names))
-        else:
-            st.write("No skills available.")
-        st.markdown("---")
-
-        # Keywords
-        st.markdown("### Keywords")
-        keywords = resume.get("Keywords", [])
-        if keywords:
-            st.write(", ".join(keywords))
-        else:
-            st.write("No keywords available.")
-    else:
+    if not resume:
         st.warning("Resume not found!")
+        return
 
+    st.markdown("<div class='section-heading'>Resume Details</div>", unsafe_allow_html=True)
+
+    # Educational Qualifications
+    edu_tile = f"<div class='tile'><div class='tile-heading'>Educational Qualifications</div>"
+    educational_qualifications = resume.get("Educational Qualifications", [])
+    if educational_qualifications:
+        for edu in educational_qualifications:
+            edu_tile += f"<p>{edu.get('degree', 'N/A')} in {edu.get('field', 'N/A')} from {edu.get('institution', 'N/A')} ({edu.get('graduationYear', 'N/A')})</p>"
+    else:
+        edu_tile += "<p>No educational qualifications available.</p>"
+    edu_tile += "</div>"
+    st.markdown(edu_tile, unsafe_allow_html=True)
+
+    # Job Experiences
+    job_tile = f"<div class='tile'><div class='tile-heading'>Job Experiences</div>"
+    job_experiences = resume.get("Job Experiences", [])
+    if job_experiences:
+        for job in job_experiences:
+            job_tile += f"<p>{job.get('title', 'N/A')} at {job.get('company', 'N/A')} ({job.get('duration', 'N/A')} years)</p>"
+    else:
+        job_tile += "<p>No job experiences available.</p>"
+    job_tile += "</div>"
+    st.markdown(job_tile, unsafe_allow_html=True)
+
+    # Skills
+    skill_tile = f"<div class='tile'><div class='tile-heading'>Skills</div>"
+    skills = resume.get("Skills", [])
+    if skills:
+        skill_names = [skill.get("skillName", "N/A") for skill in skills]
+        skill_tile += f"<p>{', '.join(skill_names)}</p>"
+    else:
+        skill_tile += "<p>No skills available.</p>"
+    skill_tile += "</div>"
+    st.markdown(skill_tile, unsafe_allow_html=True)
+
+    # Keywords
+    keyword_tile = f"<div class='tile'><div class='tile-heading'>Keywords</div>"
+    keywords = resume.get("Keywords", [])
+    if keywords:
+        keyword_tile += f"<p>{', '.join(keywords)}</p>"
+    else:
+        keyword_tile += "<p>No keywords available.</p>"
+    keyword_tile += "</div>"
+    st.markdown(keyword_tile, unsafe_allow_html=True)
 
 # New Feature: Natural Language JD Addition
 def natural_language_jd_addition():
