@@ -85,27 +85,38 @@ def find_top_matches(jd_embedding, num_candidates=10):
 def display_resume_details(resume_id):
     resume = resume_collection.find_one({"resumeId": resume_id})
     if not resume:
-        st.warning("Resume not found!")
+        st.warning("Resume details not found!")
         return
 
     # Personal Information
     st.markdown("<div class='section-heading'>Personal Information</div>", unsafe_allow_html=True)
-    st.write(f"**Name:** {resume.get('Name', 'N/A')}")
-    st.write(f"**Email:** {resume.get('Email', 'N/A')}")
-    st.write(f"**Contact No:** {resume.get('Contact No', 'N/A')}")
-    st.write(f"**Address:** {resume.get('Address', 'N/A')}")
+    st.write(f"**Name:** {resume.get('name', 'N/A')}")
+    st.write(f"**Email:** {resume.get('email', 'N/A')}")
+    st.write(f"**Contact No:** {resume.get('contactNo', 'N/A')}")
+    st.write(f"**Address:** {resume.get('address', 'N/A')}")
     st.markdown("---")
 
-    # Create a 2x2 grid for the tiles
+    # Process and Format Data
+    edu_qual = [
+        f"{eq.get('degree', 'N/A')} in {eq.get('field', 'N/A')} ({eq.get('graduationYear', 'N/A')})"
+        for eq in resume.get("educationalQualifications", [])
+    ]
+    job_exp = [
+        f"{je.get('title', 'N/A')} at {je.get('company', 'N/A')} ({je.get('duration', 'N/A')} years)"
+        for je in resume.get("jobExperiences", [])
+    ]
+    skills = [skill.get("skillName", "N/A") for skill in resume.get("skills", [])]
+    keywords = resume.get("keywords", [])
+
+    # Create a 2x2 grid for tiles
     col1, col2 = st.columns(2)
 
     # Tile 1: Educational Qualifications
     with col1:
         st.markdown("<div class='tile'><div class='tile-heading'>Educational Qualifications</div>", unsafe_allow_html=True)
-        educational_qualifications = resume.get("Educational Qualifications", [])
-        if educational_qualifications:
-            for edu in educational_qualifications:
-                st.write(f"- {edu.get('degree', 'N/A')} in {edu.get('field', 'N/A')} from {edu.get('institution', 'N/A')} ({edu.get('graduationYear', 'N/A')})")
+        if edu_qual:
+            for edu in edu_qual:
+                st.write(f"- {edu}")
         else:
             st.write("No educational qualifications available.")
         st.markdown("</div>", unsafe_allow_html=True)
@@ -113,10 +124,9 @@ def display_resume_details(resume_id):
     # Tile 2: Job Experiences
     with col2:
         st.markdown("<div class='tile'><div class='tile-heading'>Job Experiences</div>", unsafe_allow_html=True)
-        job_experiences = resume.get("Job Experiences", [])
-        if job_experiences:
-            for job in job_experiences:
-                st.write(f"- {job.get('title', 'N/A')} at {job.get('company', 'N/A')} ({job.get('duration', 'N/A')} years)")
+        if job_exp:
+            for job in job_exp:
+                st.write(f"- {job}")
         else:
             st.write("No job experiences available.")
         st.markdown("</div>", unsafe_allow_html=True)
@@ -124,10 +134,8 @@ def display_resume_details(resume_id):
     # Tile 3: Skills
     with col1:
         st.markdown("<div class='tile'><div class='tile-heading'>Skills</div>", unsafe_allow_html=True)
-        skills = resume.get("Skills", [])
         if skills:
-            skill_names = [skill.get("skillName", "N/A") for skill in skills]
-            st.write(", ".join(skill_names))
+            st.write(", ".join(skills))
         else:
             st.write("No skills available.")
         st.markdown("</div>", unsafe_allow_html=True)
@@ -135,7 +143,6 @@ def display_resume_details(resume_id):
     # Tile 4: Keywords
     with col2:
         st.markdown("<div class='tile'><div class='tile-heading'>Keywords</div>", unsafe_allow_html=True)
-        keywords = resume.get("Keywords", [])
         if keywords:
             st.write(", ".join(keywords))
         else:
