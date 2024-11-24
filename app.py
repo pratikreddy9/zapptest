@@ -81,23 +81,61 @@ def find_top_matches(jd_embedding, num_candidates=10):
     return sorted(results, key=lambda x: x["Similarity Score"], reverse=True)
 
 # Function to display detailed resume data
+# Function to display detailed resume data
 def display_resume_details(resume_id):
     resume = resume_collection.find_one({"resumeId": resume_id})
     if resume:
-        filtered_data = {
-            "Resume ID": resume.get("resumeId"),
-            "Name": resume.get("name"),
-            "Email": resume.get("email"),
-            "Contact No": resume.get("contactNo"),
-            "Address": resume.get("address"),
-            "Educational Qualifications": resume.get("educationalQualifications"),
-            "Job Experiences": resume.get("jobExperiences"),
-            "Keywords": resume.get("keywords"),
-            "Skills": resume.get("skills"),
-        }
-        st.json(filtered_data)
+        # Personal Information
+        st.markdown("### Personal Information")
+        st.write(f"**Resume ID:** {resume.get('Resume ID', 'N/A')}")
+        st.write(f"**Name:** {resume.get('Name', 'N/A')}")
+        st.write(f"**Email:** {resume.get('Email', 'N/A')}")
+        st.write(f"**Contact No:** {resume.get('Contact No', 'N/A')}")
+        st.write(f"**Address:** {resume.get('Address', 'N/A')}")
+        st.markdown("---")
+
+        # Educational Qualifications
+        st.markdown("### Educational Qualifications")
+        educational_qualifications = resume.get("Educational Qualifications", [])
+        if educational_qualifications:
+            edu_df = pd.DataFrame(educational_qualifications)
+            edu_df = edu_df.rename(columns={"degree": "Degree", "field": "Field", "graduationYear": "Graduation Year", "institution": "Institution"})
+            st.table(edu_df)
+        else:
+            st.write("No educational qualifications available.")
+        st.markdown("---")
+
+        # Job Experiences
+        st.markdown("### Job Experiences")
+        job_experiences = resume.get("Job Experiences", [])
+        if job_experiences:
+            job_df = pd.DataFrame(job_experiences)
+            job_df = job_df.rename(columns={"title": "Title", "company": "Company", "duration": "Duration (Years)"})
+            st.table(job_df)
+        else:
+            st.write("No job experiences available.")
+        st.markdown("---")
+
+        # Skills
+        st.markdown("### Skills")
+        skills = resume.get("Skills", [])
+        if skills:
+            skill_names = [skill.get("skillName", "N/A") for skill in skills]
+            st.write(", ".join(skill_names))
+        else:
+            st.write("No skills available.")
+        st.markdown("---")
+
+        # Keywords
+        st.markdown("### Keywords")
+        keywords = resume.get("Keywords", [])
+        if keywords:
+            st.write(", ".join(keywords))
+        else:
+            st.write("No keywords available.")
     else:
         st.warning("Resume not found!")
+
 
 # New Feature: Natural Language JD Addition
 def natural_language_jd_addition():
