@@ -17,6 +17,39 @@ jd_collection = db["job_description"]
 # Set Streamlit page config for wider layout
 st.set_page_config(layout="wide")
 
+# Custom CSS for visual enhancements
+def load_css():
+    st.markdown(
+        """
+        <style>
+        .metrics-container {
+            border: 2px solid #4CAF50;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            background-color: #f9f9f9;
+        }
+        .styled-table {
+            border-collapse: collapse;
+            width: 100%;
+            overflow-x: auto;
+        }
+        .styled-table th, .styled-table td {
+            text-align: left;
+            padding: 8px;
+        }
+        .styled-table th {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .styled-table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
 # Function to calculate cosine similarity
 def calculate_cosine_similarity(vector1, vector2):
     vector1 = np.array(vector1)
@@ -102,6 +135,13 @@ def display_resume_details(resume_id):
 # New Feature: Natural Language JD Search
 def natural_language_jd_search():
     st.title("Natural Language JD Search")
+    num_candidates = st.number_input(
+        "Enter the Number of Resumes to Fetch for JD Search",
+        min_value=1,
+        max_value=100,
+        value=10,
+        step=1
+    )
     jd_input = st.text_area("Paste a Job Description (JD) in natural language:")
     if st.button("Find Similar Resumes"):
         if not jd_input.strip():
@@ -112,7 +152,7 @@ def natural_language_jd_search():
             # Convert JD to structured JSON
             st.info("Structuring the Job Description...")
             structured_jd = format_job_description(jd_input)
-            st.json(structured_jd)
+            # st.json(structured_jd)  # Commented as requested
 
             # Create embedding for the structured JD
             st.info("Generating embedding for the structured JD...")
@@ -121,7 +161,7 @@ def natural_language_jd_search():
 
             # Find top matches
             st.info("Finding matching resumes...")
-            matches = find_top_matches(jd_embedding)
+            matches = find_top_matches(jd_embedding, num_candidates=num_candidates)
 
             # Display results
             if matches:
@@ -180,6 +220,7 @@ def format_job_description(jd_text):
         raise ValueError(f"Error structuring JD: {response.json()}")
 
 # Call JD search first
+load_css()
 natural_language_jd_search()
 
 # Existing Main Functionality
@@ -189,12 +230,10 @@ def main():
     # Metrics
     total_jds = jd_collection.count_documents({})
     total_resumes = resume_collection.count_documents({})
-    st.header("Metrics")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric(label="Total Resumes", value=total_resumes)
-    with col2:
-        st.metric(label="Total Job Descriptions", value=total_jds)
+    st.markdown("<div class='metrics-container'>", unsafe_allow_html=True)
+    st.metric(label="Total Resumes", value=total_resumes)
+    st.metric(label="Total Job Descriptions", value=total_jds)
+    st.markdown("</div>", unsafe_allow_html=True)
 
     col1, col2 = st.columns([1, 2])
     with col1:
@@ -229,7 +268,7 @@ def main():
         else:
             st.error("Embedding not found for the selected JD.")
 
-    # # Uncommented Resumes Table
+    # Commented Resumes Table
     # st.header("All Resumes")
     # resumes = resume_collection.find()
     # resumes_data = [{"Resume ID": resume.get("resumeId"), "Name": resume.get("name")} for resume in resumes]
