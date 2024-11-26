@@ -81,8 +81,12 @@ def find_keyword_matches(jd_keywords, num_candidates=10):
         if not resume_keywords:
             continue
 
-        # Calculate keyword matches
-        matching_keywords = set(jd_keywords).intersection(set(resume_keywords))
+        # Perform case-insensitive matching
+        matching_keywords = [
+            keyword for keyword in jd_keywords
+            if any(keyword.casefold() == resume_keyword.casefold() for resume_keyword in resume_keywords)
+        ]
+
         match_count = len(matching_keywords)
         total_keywords = len(jd_keywords)
         if total_keywords == 0:
@@ -93,7 +97,7 @@ def find_keyword_matches(jd_keywords, num_candidates=10):
             "Resume ID": resume.get("resumeId"),
             "Name": resume.get("name", "N/A"),
             "Match Percentage (Keywords)": match_percentage,
-            "Matching Keywords": list(matching_keywords)
+            "Matching Keywords": matching_keywords
         })
 
     # Return sorted results by match percentage
