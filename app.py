@@ -36,23 +36,6 @@ def load_css():
             margin-top: 20px;
             margin-bottom: 10px;
         }
-        .tile {
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 10px;
-            background-color: #f9f9f9;
-            box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
-        }
-        .tile:hover {
-            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
-        }
-        .tile-heading {
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 10px;
-            color: #333;
-        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -130,55 +113,6 @@ def display_resume_details(resume_id):
     st.write(f"**Address:** {resume.get('address', 'N/A')}")
     st.markdown("---")
 
-    edu_qual = [
-        f"{eq.get('degree', 'N/A')} in {eq.get('field', 'N/A')} ({eq.get('graduationYear', 'N/A')})"
-        for eq in resume.get("educationalQualifications", [])
-    ]
-
-    job_exp = [
-        f"{je.get('title', 'N/A')} at {je.get('company', 'N/A')} ({je.get('duration', 'N/A')} years)"
-        for je in resume.get("jobExperiences", [])
-    ]
-
-    skills = [skill.get("skillName", "N/A") for skill in resume.get("skills", [])]
-    keywords = resume.get("keywords", [])
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("<div class='tile'><div class='tile-heading'>Educational Qualifications</div>", unsafe_allow_html=True)
-        if edu_qual:
-            for edu in edu_qual:
-                st.write(f"- {edu}")
-        else:
-            st.write("No educational qualifications available.")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    with col2:
-        st.markdown("<div class='tile'><div class='tile-heading'>Job Experiences</div>", unsafe_allow_html=True)
-        if job_exp:
-            for job in job_exp:
-                st.write(f"- {job}")
-        else:
-            st.write("No job experiences available.")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    with col1:
-        st.markdown("<div class='tile'><div class='tile-heading'>Skills</div>", unsafe_allow_html=True)
-        if skills:
-            st.write(", ".join(skills))
-        else:
-            st.write("No skills available.")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    with col2:
-        st.markdown("<div class='tile'><div class='tile-heading'>Keywords</div>", unsafe_allow_html=True)
-        if keywords:
-            st.write(", ".join(keywords))
-        else:
-            st.write("No keywords available.")
-        st.markdown("</div>", unsafe_allow_html=True)
-
 # Main application logic
 def main():
     st.markdown("<div class='metrics-container'>", unsafe_allow_html=True)
@@ -194,37 +128,6 @@ def main():
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-    jd_input_area()
-    display_match_results()
-
-def jd_input_area():
-    st.markdown("<div class='section-heading'>Add a Job Description</div>", unsafe_allow_html=True)
-    jd_id_input = st.text_input("Enter Job ID", placeholder="e.g., 1234abcd-5678-efgh-9101-ijklmnopqrs")
-    jd_input = st.text_area("Paste a Job Description (JD) in natural language:")
-
-    if st.button("Store Job Description"):
-        if not jd_id_input.strip():
-            st.error("Please provide a valid Job ID.")
-            return
-        if not jd_input.strip():
-            st.error("Please provide a valid Job Description.")
-            return
-
-        payload = {
-            "jobId": jd_id_input.strip(),
-            "jobDescription": jd_input.strip()
-        }
-
-        try:
-            response = requests.post(lambda_url, json=payload)
-            if response.status_code == 200:
-                st.success(f"Job Description stored successfully! Job ID: {jd_id_input}")
-            else:
-                st.error(f"Lambda error: {response.json()}")
-        except Exception as e:
-            st.error(f"Error: {e}")
-
-def display_match_results():
     st.markdown("<div class='section-heading'>Select Job Description for Matching</div>", unsafe_allow_html=True)
     jds = list(jd_collection.find())
     jd_mapping = {jd.get("jobDescription", "N/A"): jd.get("jobId", "N/A") for jd in jds}
@@ -233,7 +136,7 @@ def display_match_results():
     if selected_jd_description:
         selected_jd_id = jd_mapping[selected_jd_description]
         selected_jd = next(jd for jd in jds if jd.get("jobId") == selected_jd_id)
-        jd_keywords = selected_jd.get("keywords", [])
+        jd_keywords = selected_jd.get("structured_query", {}).get("keywords", [])
         jd_embedding = selected_jd.get("embedding")
 
         st.write(f"**Job Description ID:** {selected_jd_id}")
