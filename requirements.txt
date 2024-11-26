@@ -4,3 +4,5 @@ numpy
 pymongo
 requests
 openai
+rapidfuzz
+nltk
