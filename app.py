@@ -60,8 +60,8 @@ def fuzzy_match(keyword, target_keywords, threshold=80):
     return any(fuzz.ratio(keyword, tk) >= threshold for tk in target_keywords)
 
 # Function to calculate keyword match percentage
-def find_keyword_matches(jd_keywords, num_candidates=10, keyword_weight=0.7, vector_weight=0.3):
-    """Match resumes to job descriptions using keywords and vector similarity."""
+def find_keyword_matches(jd_keywords, num_candidates=10):
+    """Match resumes to job descriptions using keywords."""
     results = []
     resumes = resume_collection.find().limit(num_candidates)
 
@@ -88,20 +88,15 @@ def find_keyword_matches(jd_keywords, num_candidates=10, keyword_weight=0.7, vec
             continue
         match_percentage = round((match_count / total_keywords) * 100, 2)
 
-        # Example: Combine with vector similarity score (mocked here for demo)
-        vector_score = 85  # Placeholder value for vector similarity
-        final_score = (match_percentage * keyword_weight) + (vector_score * vector_weight)
-
         results.append({
             "Resume ID": resume.get("resumeId"),
             "Name": resume.get("name", "N/A"),
-            "Match Percentage (Keywords)": match_percentage,
-            "Final Score": round(final_score, 2),
+            "Match Percentage": match_percentage,
             "Matching Keywords": matching_keywords
         })
 
-    # Return sorted results by final score
-    return sorted(results, key=lambda x: x["Final Score"], reverse=True)
+    # Return sorted results by match percentage
+    return sorted(results, key=lambda x: x["Match Percentage"], reverse=True)
 
 # Function to calculate match percentages using cosine similarity
 def find_top_matches(jd_embedding, num_candidates=10):
@@ -127,11 +122,11 @@ def find_top_matches(jd_embedding, num_candidates=10):
         results.append({
             "Resume ID": resume.get("resumeId"),
             "Name": resume.get("name", "N/A"),
-            "Match Percentage (Vector)": match_percentage
+            "Match Percentage": match_percentage
         })
 
     # Return sorted results by match percentage in descending order
-    return sorted(results, key=lambda x: x["Match Percentage (Vector)"], reverse=True)
+    return sorted(results, key=lambda x: x["Match Percentage"], reverse=True)
 
 # Function to display detailed resume information
 def display_resume_details(resume_id):
@@ -146,6 +141,37 @@ def display_resume_details(resume_id):
     st.write(f"**Contact No:** {resume.get('contactNo', 'N/A')}")
     st.write(f"**Address:** {resume.get('address', 'N/A')}")
     st.markdown("---")
+
+    edu_qual = [
+        f"{eq.get('degree', 'N/A')} in {eq.get('field', 'N/A')} ({eq.get('graduationYear', 'N/A')})"
+        for eq in resume.get("educationalQualifications", [])
+    ]
+
+    job_exp = [
+        f"{je.get('title', 'N/A')} at {je.get('company', 'N/A')} ({je.get('duration', 'N/A')} years)"
+        for je in resume.get("jobExperiences", [])
+    ]
+
+    skills = [skill.get("skillName", "N/A") for skill in resume.get("skills", [])]
+    keywords = resume.get("keywords", [])
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("Educational Qualifications")
+        st.write("\n".join(edu_qual) if edu_qual else "No educational qualifications available.")
+
+    with col2:
+        st.subheader("Job Experiences")
+        st.write("\n".join(job_exp) if job_exp else "No job experiences available.")
+
+    with col1:
+        st.subheader("Skills")
+        st.write(", ".join(skills) if skills else "No skills available.")
+
+    with col2:
+        st.subheader("Keywords")
+        st.write(", ".join(keywords) if keywords else "No keywords available.")
 
 # Main application logic
 def main():
@@ -162,6 +188,16 @@ def main():
 
     st.markdown("</div>", unsafe_allow_html=True)
 
+    # Search by Resume ID
+    st.markdown("<div class='section-heading'>Search Candidate by Resume ID</div>", unsafe_allow_html=True)
+    search_id = st.text_input("Enter Resume ID:")
+    if st.button("Search"):
+        if search_id.strip():
+            display_resume_details(search_id)
+        else:
+            st.warning("Please enter a valid Resume ID.")
+
+    # JD Matching
     st.markdown("<div class='section-heading'>Select Job Description for Matching</div>", unsafe_allow_html=True)
     jds = list(jd_collection.find())
     jd_mapping = {jd.get("jobDescription", "N/A"): jd.get("jobId", "N/A") for jd in jds}
@@ -180,10 +216,10 @@ def main():
         st.subheader("Top Matches (Keywords)")
         keyword_matches = find_keyword_matches(jd_keywords)
         if keyword_matches:
-            keyword_match_df = pd.DataFrame(keyword_matches).astype(str)
+            keyword_match_df = pd.DataFrame(keyword_matches).drop(columns=["Final Score"]).astype(str)
             st.dataframe(keyword_match_df, use_container_width=True, height=300)
         else:
-            st.info("No matching resumes found for keywords.")
+            st.info("No matching resumes found.")
 
         # Vector Matching
         if jd_embedding:
@@ -193,7 +229,7 @@ def main():
                 vector_match_df = pd.DataFrame(vector_matches).astype(str)
                 st.dataframe(vector_match_df, use_container_width=True, height=300)
             else:
-                st.info("No matching resumes found for vector similarity.")
+                st.info("No matching resumes found.")
         else:
             st.error("Embedding not found for the selected JD.")
 
