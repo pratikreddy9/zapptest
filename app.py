@@ -1,9 +1,10 @@
 import streamlit as st
 import pandas as pd
 from pymongo import MongoClient
+import requests
 import re
+from rapidfuzz import fuzz
 import os
-import json
 
 # Disable Streamlit's file watcher to avoid inotify limit issues
 os.environ["STREAMLIT_SERVER_FILE_WATCHER_TYPE"] = "none"
@@ -14,145 +15,192 @@ client = MongoClient(mongo_uri)
 
 # Accessing the database and collections
 db = client["resumes_database"]
-resume_collection = db["resumes"]
-jd_collection = db["job_description"]
+resume_collection = db["resumes"]  # Collection for resumes
+jd_collection = db["job_description"]  # Collection for job descriptions
+
+# Lambda function URL for processing job descriptions
+lambda_url = "https://ljlj3twvuk.execute-api.ap-south-1.amazonaws.com/default/getJobDescriptionVector"
 
 # Set Streamlit page configuration for a wider layout
 st.set_page_config(layout="wide")
 
-# Function to preprocess and normalize text
-def preprocess_text(text):
-    """Normalize text by lowercasing, stripping, and removing special characters."""
-    return re.sub(r'[^a-zA-Z0-9\s]', '', text.strip().lower())
+# Load custom CSS for consistent styling
+def load_css():
+    st.markdown(
+        """
+        <style>
+        .metrics-container {
+            border: 2px solid #4CAF50;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            background-color: #f9f9f9;
+        }
+        .section-heading {
+            border-left: 5px solid #4CAF50;
+            padding-left: 10px;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
-# Function to combine keywords and skills into a unified list
-def combine_keywords_and_skills(keywords, skills):
-    """Combine keywords and skills into a single list after preprocessing."""
-    # Debug print
-    st.write("Input to combine_keywords_and_skills:")
-    st.write("Keywords:", keywords)
-    st.write("Skills:", skills)
-    
-    # Extract valid skillName values from the skills array
-    valid_skills = [skill.get("skillName", "") for skill in skills if isinstance(skill, dict) and skill.get("skillName")]
-    # Ensure keywords is a list
-    keyword_list = keywords if isinstance(keywords, list) else []
-    
-    # Debug print
-    st.write("Processed skills:", valid_skills)
-    st.write("Processed keywords:", keyword_list)
-    
-    combined = keyword_list + valid_skills
-    processed = [preprocess_text(item) for item in combined if item]
-    
-    # Debug print
-    st.write("Final combined and processed list:", processed)
-    
-    return processed
+# Function to preprocess keywords
+def preprocess_keyword(keyword):
+    """Preprocess a keyword by normalizing its format."""
+    keyword = keyword.casefold().strip()  # Lowercase and strip spaces
+    keyword = re.sub(r'[^\w\s]', '', keyword)  # Remove special characters
+    return ' '.join(sorted(keyword.split()))  # Sort multi-word phrases
 
-# Function to find exact matches between two lists
-def find_exact_matches(jd_terms, resume_terms):
-    """Find exact matches between job description and resume terms."""
-    matches = list(set(jd_terms) & set(resume_terms))
-    # Debug print
-    st.write("Matching terms found:", matches)
-    return matches
+# Function for fuzzy matching
+def fuzzy_match(keyword, target_keywords, threshold=80):
+    """Perform fuzzy matching with a similarity threshold."""
+    return any(fuzz.ratio(keyword, tk) >= threshold for tk in target_keywords)
 
-# Function to calculate match percentages and details
-def calculate_match_percentage(jd_combined, num_candidates=10):
-    """Match resumes to job descriptions using combined keywords and skills."""
-    st.write("JD Combined Terms for Matching:", jd_combined)
-    
+# Function to calculate keyword match percentage
+def find_keyword_matches(jd_keywords, num_candidates=10):
+    """Match resumes to job descriptions using keywords."""
     results = []
     resumes = resume_collection.find().limit(num_candidates)
 
+    # Preprocess JD keywords
+    jd_keywords_normalized = [preprocess_keyword(keyword) for keyword in jd_keywords]
+
     for resume in resumes:
-        # Debug print
-        st.write(f"\nProcessing Resume ID: {resume.get('resumeId')}")
-        
-        # Combine resume keywords and skills
         resume_keywords = resume.get("keywords", [])
-        resume_skills = resume.get("skills", [])
-        
-        st.write("Resume Keywords:", resume_keywords)
-        st.write("Resume Skills:", resume_skills)
-        
-        resume_combined = combine_keywords_and_skills(resume_keywords, resume_skills)
-        st.write("Combined Resume Terms:", resume_combined)
+        if not resume_keywords:
+            continue
 
-        # Find exact matches
-        matching_terms = find_exact_matches(jd_combined, resume_combined)
-        match_count = len(matching_terms)
-        total_terms = len(jd_combined)
-        match_percentage = round((match_count / total_terms) * 100, 2) if total_terms > 0 else 0
+        # Preprocess resume keywords
+        resume_keywords_normalized = [preprocess_keyword(keyword) for keyword in resume_keywords]
 
-        st.write(f"Match count: {match_count}")
-        st.write(f"Total terms: {total_terms}")
-        st.write(f"Match percentage: {match_percentage}%")
+        # Exact match and fuzzy match
+        matching_keywords = [
+            keyword for keyword in jd_keywords_normalized
+            if any(preprocess_keyword(keyword) == rk or fuzzy_match(keyword, [rk]) for rk in resume_keywords_normalized)
+        ]
+
+        match_count = len(matching_keywords)
+        total_keywords = len(jd_keywords_normalized)
+        if total_keywords == 0:
+            continue
+        match_percentage = round((match_count / total_keywords) * 100, 2)
 
         results.append({
             "Resume ID": resume.get("resumeId"),
             "Name": resume.get("name", "N/A"),
-            "Match Percentage": match_percentage,
-            "Matching Terms": ', '.join(matching_terms),
-            "Combined Resume Keys": ', '.join(resume_combined),
+            "Match Percentage (Keywords)": match_percentage,
+            "Matching Keywords": matching_keywords
         })
 
     # Return sorted results by match percentage
-    return sorted(results, key=lambda x: x["Match Percentage"], reverse=True)
+    return sorted(results, key=lambda x: x["Match Percentage (Keywords)"], reverse=True)
+
+# Function to calculate match percentages using cosine similarity
+def find_top_matches(jd_embedding, num_candidates=10):
+    results = []
+    resumes = resume_collection.find().limit(num_candidates)
+
+    for resume in resumes:
+        resume_embedding = resume.get("embedding")
+        if not resume_embedding:
+            continue
+
+        # Cosine similarity calculation
+        dot_product = sum(a * b for a, b in zip(jd_embedding, resume_embedding))
+        magnitude_jd = sum(a * a for a in jd_embedding) ** 0.5
+        magnitude_resume = sum(b * b for b in resume_embedding) ** 0.5
+        if magnitude_jd == 0 or magnitude_resume == 0:
+            continue
+        similarity_score = dot_product / (magnitude_jd * magnitude_resume)
+
+        # Convert similarity score to match percentage
+        match_percentage = round(similarity_score * 100, 2)
+
+        results.append({
+            "Resume ID": resume.get("resumeId"),
+            "Name": resume.get("name", "N/A"),
+            "Match Percentage (Vector)": match_percentage
+        })
+
+    # Return sorted results by match percentage in descending order
+    return sorted(results, key=lambda x: x["Match Percentage (Vector)"], reverse=True)
+
+# Function to display detailed resume information
+def display_resume_details(resume_id):
+    resume = resume_collection.find_one({"resumeId": resume_id})
+    if not resume:
+        st.warning("Resume details not found!")
+        return
+
+    st.markdown("<div class='section-heading'>Personal Information</div>", unsafe_allow_html=True)
+    st.write(f"**Name:** {resume.get('name', 'N/A')}")
+    st.write(f"**Email:** {resume.get('email', 'N/A')}")
+    st.write(f"**Contact No:** {resume.get('contactNo', 'N/A')}")
+    st.write(f"**Address:** {resume.get('address', 'N/A')}")
+    st.markdown("---")
 
 # Main application logic
 def main():
-    st.title("JD and Resume Matching")
-    
-    # Database summary
+    st.markdown("<div class='metrics-container'>", unsafe_allow_html=True)
+
     total_resumes = resume_collection.count_documents({})
     total_jds = jd_collection.count_documents({})
-    st.metric("Total Resumes", total_resumes)
-    st.metric("Total Job Descriptions", total_jds)
+    col1, col2 = st.columns(2)
 
-    # Select JD for matching
+    with col1:
+        st.metric(label="Total Resumes", value=total_resumes)
+    with col2:
+        st.metric(label="Total Job Descriptions", value=total_jds)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Search by Resume ID
+    st.markdown("<div class='section-heading'>Search Candidate by Resume ID</div>", unsafe_allow_html=True)
+    search_id = st.text_input("Enter Resume ID:")
+    if st.button("Search"):
+        if search_id.strip():
+            display_resume_details(search_id)
+        else:
+            st.warning("Please enter a valid Resume ID.")
+
+    st.markdown("<div class='section-heading'>Select Job Description for Matching</div>", unsafe_allow_html=True)
     jds = list(jd_collection.find())
-    
-    # Debug print
-    st.write("Available JDs:")
-    for jd in jds:
-        st.write(f"ID: {jd.get('jobId')}, Description: {jd.get('jobDescription')[:100]}...")
-    
     jd_mapping = {jd.get("jobDescription", "N/A"): jd.get("jobId", "N/A") for jd in jds}
     selected_jd_description = st.selectbox("Select a Job Description:", list(jd_mapping.keys()))
 
     if selected_jd_description:
         selected_jd_id = jd_mapping[selected_jd_description]
         selected_jd = next(jd for jd in jds if jd.get("jobId") == selected_jd_id)
+        jd_keywords = selected_jd.get("structured_query", {}).get("keywords", [])
+        jd_embedding = selected_jd.get("embedding")
 
-        # Debug print full JD
-        st.write("Selected JD Full Content:")
-        st.write(selected_jd)
+        st.write(f"**Job Description ID:** {selected_jd_id}")
+        st.write(f"**Job Description:** {selected_jd_description}")
 
-        # Combine JD keywords and skills
-        jd_keywords = selected_jd.get("keywords", [])
-        jd_skills = selected_jd.get("skills", [])
-        
-        st.write("Raw JD Keywords:", jd_keywords)
-        st.write("Raw JD Skills:", jd_skills)
-        
-        jd_combined = combine_keywords_and_skills(jd_keywords, jd_skills)
-
-        st.write("Combined JD Keys:", jd_combined)
-
-        if not jd_combined:
-            st.error("No keywords or skills found in the selected job description!")
-            return
-
-        # Perform matching
-        st.subheader("Resume Matching Results")
-        matches = calculate_match_percentage(jd_combined)
-        if matches:
-            match_df = pd.DataFrame(matches)
-            st.dataframe(match_df, use_container_width=True)
+        # Keyword Matching
+        st.subheader("Top Matches (Keywords)")
+        keyword_matches = find_keyword_matches(jd_keywords)
+        if keyword_matches:
+            keyword_match_df = pd.DataFrame(keyword_matches).drop(columns=["Final Score"], errors="ignore").astype(str)
+            st.dataframe(keyword_match_df, use_container_width=True, height=300)
         else:
             st.info("No matching resumes found.")
 
+        # Vector Matching
+        if jd_embedding:
+            st.subheader("Top Matches (Vector Similarity)")
+            vector_matches = find_top_matches(jd_embedding)
+            if vector_matches:
+                vector_match_df = pd.DataFrame(vector_matches).astype(str)
+                st.dataframe(vector_match_df, use_container_width=True, height=300)
+            else:
+                st.info("No matching resumes found.")
+        else:
+            st.error("Embedding not found for the selected JD.")
+
 if __name__ == "__main__":
+    load_css()
     main()
