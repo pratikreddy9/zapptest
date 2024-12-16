@@ -60,51 +60,44 @@ def fuzzy_match(keyword, target_keywords, threshold=80):
     return any(fuzz.ratio(keyword, tk) >= threshold for tk in target_keywords)
 
 # Function to calculate keyword and skill match percentage
-def find_keyword_and_skill_matches(jd_keywords, jd_skills, num_candidates=10):
-    """Match resumes to job descriptions using keywords and skills."""
+def find_matches(jd_combined, num_candidates=10):
+    """Match resumes to job descriptions using combined keywords and skills."""
     results = []
     resumes = resume_collection.find().limit(num_candidates)
 
-    # Preprocess JD keywords and skills
-    jd_keywords_normalized = [preprocess_keyword(keyword) for keyword in jd_keywords]
-    jd_skills_normalized = [preprocess_keyword(skill) for skill in jd_skills]
+    # Preprocess JD combined list (keywords + skills)
+    jd_combined_normalized = [preprocess_keyword(term) for term in jd_combined]
 
     for resume in resumes:
+        # Combine resume keywords and skills into one list
         resume_keywords = resume.get("keywords", [])
         resume_skills = [skill.get("skillName", "") for skill in resume.get("skills", []) if skill.get("skillName")]
+        resume_combined = resume_keywords + resume_skills
 
-        # Preprocess resume keywords and skills
-        resume_keywords_normalized = [preprocess_keyword(keyword) for keyword in resume_keywords]
-        resume_skills_normalized = [preprocess_keyword(skill) for skill in resume_skills]
+        # Preprocess combined resume list
+        resume_combined_normalized = [preprocess_keyword(term) for term in resume_combined]
 
-        # Exact match and fuzzy match
-        matching_keywords = [
-            keyword for keyword in jd_keywords_normalized
-            if any(preprocess_keyword(keyword) == rk or fuzzy_match(keyword, [rk]) for rk in resume_keywords_normalized)
+        # Match terms (exact and fuzzy matches)
+        matching_terms = [
+            term for term in jd_combined_normalized
+            if any(preprocess_keyword(term) == rc or fuzzy_match(term, [rc]) for rc in resume_combined_normalized)
         ]
 
-        matching_skills = [
-            skill for skill in jd_skills_normalized
-            if any(preprocess_keyword(skill) == rs or fuzzy_match(skill, [rs]) for rs in resume_skills_normalized)
-        ]
-
-        total_matches = matching_keywords + matching_skills
-        match_count = len(total_matches)
-        total_keywords_and_skills = len(jd_keywords_normalized) + len(jd_skills_normalized)
-        if total_keywords_and_skills == 0:
+        match_count = len(matching_terms)
+        total_terms = len(jd_combined_normalized)
+        if total_terms == 0:
             continue
-        match_percentage = round((match_count / total_keywords_and_skills) * 100, 2)
+        match_percentage = round((match_count / total_terms) * 100, 2)
 
         results.append({
             "Resume ID": resume.get("resumeId"),
             "Name": resume.get("name", "N/A"),
-            "Match Percentage (Keywords and Skills)": match_percentage,
-            "Matching Keywords": matching_keywords,
-            "Matching Skills": matching_skills
+            "Match Percentage": match_percentage,
+            "Matching Terms": matching_terms
         })
 
     # Return sorted results by match percentage
-    return sorted(results, key=lambda x: x["Match Percentage (Keywords and Skills)"], reverse=True)
+    return sorted(results, key=lambda x: x["Match Percentage"], reverse=True)
 
 # Function to calculate match percentages using cosine similarity
 def find_top_matches(jd_embedding, num_candidates=10):
@@ -183,20 +176,21 @@ def main():
         selected_jd_id = jd_mapping[selected_jd_description]
         selected_jd = next(jd for jd in jds if jd.get("jobId") == selected_jd_id)
 
-        # Extract keywords and skills
+        # Combine JD keywords and skills into one list
         jd_keywords = selected_jd.get("structured_query", {}).get("keywords", [])
         jd_skills = [skill.get("skillName", "") for skill in selected_jd.get("skills", []) if skill.get("skillName")]
+        jd_combined = jd_keywords + jd_skills
 
         jd_embedding = selected_jd.get("embedding")
 
         st.write(f"**Job Description ID:** {selected_jd_id}")
         st.write(f"**Job Description:** {selected_jd_description}")
 
-        # Keyword and Skill Matching
-        st.subheader("Top Matches (Keywords and Skills)")
-        keyword_and_skill_matches = find_keyword_and_skill_matches(jd_keywords, jd_skills)
-        if keyword_and_skill_matches:
-            match_df = pd.DataFrame(keyword_and_skill_matches).astype(str)
+        # Combined Matching
+        st.subheader("Top Matches (Combined Keywords and Skills)")
+        matches = find_matches(jd_combined)
+        if matches:
+            match_df = pd.DataFrame(matches).astype(str)
             st.dataframe(match_df, use_container_width=True, height=300)
         else:
             st.info("No matching resumes found.")
