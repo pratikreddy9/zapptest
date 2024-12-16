@@ -3,6 +3,7 @@ import pandas as pd
 from pymongo import MongoClient
 import re
 import os
+import json
 
 # Disable Streamlit's file watcher to avoid inotify limit issues
 os.environ["STREAMLIT_SERVER_FILE_WATCHER_TYPE"] = "none"
@@ -27,35 +28,67 @@ def preprocess_text(text):
 # Function to combine keywords and skills into a unified list
 def combine_keywords_and_skills(keywords, skills):
     """Combine keywords and skills into a single list after preprocessing."""
+    # Debug print
+    st.write("Input to combine_keywords_and_skills:")
+    st.write("Keywords:", keywords)
+    st.write("Skills:", skills)
+    
     # Extract valid skillName values from the skills array
-    valid_skills = [skill.get("skillName", "") for skill in skills if skill.get("skillName")]
+    valid_skills = [skill.get("skillName", "") for skill in skills if isinstance(skill, dict) and skill.get("skillName")]
     # Ensure keywords is a list
     keyword_list = keywords if isinstance(keywords, list) else []
+    
+    # Debug print
+    st.write("Processed skills:", valid_skills)
+    st.write("Processed keywords:", keyword_list)
+    
     combined = keyword_list + valid_skills
-    return [preprocess_text(item) for item in combined if item]
+    processed = [preprocess_text(item) for item in combined if item]
+    
+    # Debug print
+    st.write("Final combined and processed list:", processed)
+    
+    return processed
 
 # Function to find exact matches between two lists
 def find_exact_matches(jd_terms, resume_terms):
     """Find exact matches between job description and resume terms."""
-    return list(set(jd_terms) & set(resume_terms))
+    matches = list(set(jd_terms) & set(resume_terms))
+    # Debug print
+    st.write("Matching terms found:", matches)
+    return matches
 
 # Function to calculate match percentages and details
 def calculate_match_percentage(jd_combined, num_candidates=10):
     """Match resumes to job descriptions using combined keywords and skills."""
+    st.write("JD Combined Terms for Matching:", jd_combined)
+    
     results = []
     resumes = resume_collection.find().limit(num_candidates)
 
     for resume in resumes:
+        # Debug print
+        st.write(f"\nProcessing Resume ID: {resume.get('resumeId')}")
+        
         # Combine resume keywords and skills
         resume_keywords = resume.get("keywords", [])
         resume_skills = resume.get("skills", [])
+        
+        st.write("Resume Keywords:", resume_keywords)
+        st.write("Resume Skills:", resume_skills)
+        
         resume_combined = combine_keywords_and_skills(resume_keywords, resume_skills)
+        st.write("Combined Resume Terms:", resume_combined)
 
         # Find exact matches
         matching_terms = find_exact_matches(jd_combined, resume_combined)
         match_count = len(matching_terms)
         total_terms = len(jd_combined)
         match_percentage = round((match_count / total_terms) * 100, 2) if total_terms > 0 else 0
+
+        st.write(f"Match count: {match_count}")
+        st.write(f"Total terms: {total_terms}")
+        st.write(f"Match percentage: {match_percentage}%")
 
         results.append({
             "Resume ID": resume.get("resumeId"),
@@ -80,6 +113,12 @@ def main():
 
     # Select JD for matching
     jds = list(jd_collection.find())
+    
+    # Debug print
+    st.write("Available JDs:")
+    for jd in jds:
+        st.write(f"ID: {jd.get('jobId')}, Description: {jd.get('jobDescription')[:100]}...")
+    
     jd_mapping = {jd.get("jobDescription", "N/A"): jd.get("jobId", "N/A") for jd in jds}
     selected_jd_description = st.selectbox("Select a Job Description:", list(jd_mapping.keys()))
 
@@ -87,18 +126,24 @@ def main():
         selected_jd_id = jd_mapping[selected_jd_description]
         selected_jd = next(jd for jd in jds if jd.get("jobId") == selected_jd_id)
 
-        # Combine JD keywords and skills - FIXED: Access keywords directly from root
-        jd_keywords = selected_jd.get("keywords", [])  # Changed from structured_query.keywords
+        # Debug print full JD
+        st.write("Selected JD Full Content:")
+        st.write(selected_jd)
+
+        # Combine JD keywords and skills
+        jd_keywords = selected_jd.get("keywords", [])
         jd_skills = selected_jd.get("skills", [])
+        
+        st.write("Raw JD Keywords:", jd_keywords)
+        st.write("Raw JD Skills:", jd_skills)
+        
         jd_combined = combine_keywords_and_skills(jd_keywords, jd_skills)
 
-        # Display combined JD keys
-        st.write(f"**Combined JD Keys:** {', '.join(jd_combined)}")
+        st.write("Combined JD Keys:", jd_combined)
 
-        # Add debug information
-        st.write("**Debug Information:**")
-        st.write(f"Keywords from JD: {jd_keywords}")
-        st.write(f"Skills from JD: {[skill.get('skillName') for skill in jd_skills if skill.get('skillName')]}")
+        if not jd_combined:
+            st.error("No keywords or skills found in the selected job description!")
+            return
 
         # Perform matching
         st.subheader("Resume Matching Results")
