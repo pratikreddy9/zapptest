@@ -89,7 +89,8 @@ def calculate_match_percentage(jd_terms, num_candidates=10):
             "Resume ID": resume.get("resumeId"),
             "Name": resume.get("name", "N/A"),
             "Match Percentage": match_percentage,
-            "Matching Terms": matching_terms
+            "Matching Terms": matching_terms,
+            "Combined Resume Keys": resume_combined
         })
 
     # Return sorted results by match percentage
@@ -181,6 +182,7 @@ def main():
 
         st.write(f"**Job Description ID:** {selected_jd_id}")
         st.write(f"**Job Description:** {selected_jd_description}")
+        st.write(f"**Combined JD Keys:** {', '.join(jd_combined)}")
 
         # Combined Matching
         st.subheader("Top Matches (Combined Keywords and Skills)")
