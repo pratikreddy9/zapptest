@@ -174,7 +174,12 @@ def main():
     if selected_jd_description:
         selected_jd_id = jd_mapping[selected_jd_description]
         selected_jd = next(jd for jd in jds if jd.get("jobId") == selected_jd_id)
+
+        # Combine keywords and skill names
         jd_keywords = selected_jd.get("structured_query", {}).get("keywords", [])
+        skill_names = [skill.get("skillName", "") for skill in selected_jd.get("skills", []) if skill.get("skillName")]
+        jd_keywords.extend(skill_names)  # Add skill names to the list of keywords
+
         jd_embedding = selected_jd.get("embedding")
 
         st.write(f"**Job Description ID:** {selected_jd_id}")
