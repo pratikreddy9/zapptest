@@ -13,34 +13,11 @@ client = MongoClient(mongo_uri)
 
 # Accessing the database and collections
 db = client["resumes_database"]
-resume_collection = db["resumes"]  # Collection for resumes
-jd_collection = db["job_description"]  # Collection for job descriptions
+resume_collection = db["resumes"]
+jd_collection = db["job_description"]
 
 # Set Streamlit page configuration for a wider layout
 st.set_page_config(layout="wide")
-
-# Load custom CSS for consistent styling
-def load_css():
-    st.markdown(
-        """
-        <style>
-        .metrics-container {
-            border: 2px solid #4CAF50;
-            padding: 10px;
-            margin-bottom: 20px;
-            border-radius: 10px;
-            background-color: #f9f9f9;
-        }
-        .section-heading {
-            border-left: 5px solid #4CAF50;
-            padding-left: 10px;
-            margin-top: 20px;
-            margin-bottom: 10px;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
 
 # Function to preprocess and normalize text
 def preprocess_text(text):
@@ -50,7 +27,9 @@ def preprocess_text(text):
 # Function to combine keywords and skills into a unified list
 def combine_keywords_and_skills(keywords, skills):
     """Combine keywords and skills into a single list after preprocessing."""
-    combined = keywords + [skill.get("skillName", "") for skill in skills if skill.get("skillName")]
+    # Extract valid skillName values from the skills array
+    valid_skills = [skill.get("skillName", "") for skill in skills if skill.get("skillName")]
+    combined = keywords + valid_skills
     return [preprocess_text(item) for item in combined if item]
 
 # Function to find exact matches between two lists
@@ -89,35 +68,15 @@ def calculate_match_percentage(jd_combined, num_candidates=10):
 
 # Main application logic
 def main():
-    load_css()
-    st.markdown("<div class='metrics-container'>", unsafe_allow_html=True)
-
+    st.title("JD and Resume Matching")
+    
+    # Database summary
     total_resumes = resume_collection.count_documents({})
     total_jds = jd_collection.count_documents({})
-    col1, col2 = st.columns(2)
+    st.metric("Total Resumes", total_resumes)
+    st.metric("Total Job Descriptions", total_jds)
 
-    with col1:
-        st.metric(label="Total Resumes", value=total_resumes)
-    with col2:
-        st.metric(label="Total Job Descriptions", value=total_jds)
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # Search by Resume ID
-    st.markdown("<div class='section-heading'>Search Candidate by Resume ID</div>", unsafe_allow_html=True)
-    search_id = st.text_input("Enter Resume ID:")
-    if st.button("Search"):
-        if search_id.strip():
-            resume = resume_collection.find_one({"resumeId": search_id})
-            if resume:
-                st.write(resume)
-            else:
-                st.warning("Resume not found!")
-        else:
-            st.warning("Please enter a valid Resume ID.")
-
-    # Select Job Description for Matching
-    st.markdown("<div class='section-heading'>Select Job Description for Matching</div>", unsafe_allow_html=True)
+    # Select JD for matching
     jds = list(jd_collection.find())
     jd_mapping = {jd.get("jobDescription", "N/A"): jd.get("jobId", "N/A") for jd in jds}
     selected_jd_description = st.selectbox("Select a Job Description:", list(jd_mapping.keys()))
@@ -126,20 +85,20 @@ def main():
         selected_jd_id = jd_mapping[selected_jd_description]
         selected_jd = next(jd for jd in jds if jd.get("jobId") == selected_jd_id)
 
-        # Combine JD keywords and skills into a unified list
+        # Combine JD keywords and skills
         jd_keywords = selected_jd.get("structured_query", {}).get("keywords", [])
         jd_skills = selected_jd.get("skills", [])
         jd_combined = combine_keywords_and_skills(jd_keywords, jd_skills)
 
-        # Display Combined JD Keys
+        # Display combined JD keys
         st.write(f"**Combined JD Keys:** {', '.join(jd_combined)}")
 
-        # Calculate Match Percentages
-        st.subheader("Top Matches")
+        # Perform matching
+        st.subheader("Resume Matching Results")
         matches = calculate_match_percentage(jd_combined)
         if matches:
             match_df = pd.DataFrame(matches)
-            st.dataframe(match_df, use_container_width=True, height=300)
+            st.dataframe(match_df, use_container_width=True)
         else:
             st.info("No matching resumes found.")
 
