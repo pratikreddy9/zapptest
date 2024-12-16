@@ -29,7 +29,9 @@ def combine_keywords_and_skills(keywords, skills):
     """Combine keywords and skills into a single list after preprocessing."""
     # Extract valid skillName values from the skills array
     valid_skills = [skill.get("skillName", "") for skill in skills if skill.get("skillName")]
-    combined = keywords + valid_skills
+    # Ensure keywords is a list
+    keyword_list = keywords if isinstance(keywords, list) else []
+    combined = keyword_list + valid_skills
     return [preprocess_text(item) for item in combined if item]
 
 # Function to find exact matches between two lists
@@ -85,13 +87,18 @@ def main():
         selected_jd_id = jd_mapping[selected_jd_description]
         selected_jd = next(jd for jd in jds if jd.get("jobId") == selected_jd_id)
 
-        # Combine JD keywords and skills
-        jd_keywords = selected_jd.get("structured_query", {}).get("keywords", [])
+        # Combine JD keywords and skills - FIXED: Access keywords directly from root
+        jd_keywords = selected_jd.get("keywords", [])  # Changed from structured_query.keywords
         jd_skills = selected_jd.get("skills", [])
         jd_combined = combine_keywords_and_skills(jd_keywords, jd_skills)
 
         # Display combined JD keys
         st.write(f"**Combined JD Keys:** {', '.join(jd_combined)}")
+
+        # Add debug information
+        st.write("**Debug Information:**")
+        st.write(f"Keywords from JD: {jd_keywords}")
+        st.write(f"Skills from JD: {[skill.get('skillName') for skill in jd_skills if skill.get('skillName')]}")
 
         # Perform matching
         st.subheader("Resume Matching Results")
