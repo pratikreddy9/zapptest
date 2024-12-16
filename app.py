@@ -90,7 +90,7 @@ def calculate_match_percentage(jd_terms, num_candidates=10):
             "Name": resume.get("name", "N/A"),
             "Match Percentage": match_percentage,
             "Matching Terms": matching_terms,
-            "Combined Resume Keys": resume_combined
+            "Combined Resume Keys": ', '.join(resume_combined)
         })
 
     # Return sorted results by match percentage
@@ -182,13 +182,14 @@ def main():
 
         st.write(f"**Job Description ID:** {selected_jd_id}")
         st.write(f"**Job Description:** {selected_jd_description}")
-        st.write(f"**Combined JD Keys:** {', '.join(jd_combined)}")
 
         # Combined Matching
         st.subheader("Top Matches (Combined Keywords and Skills)")
         matches = calculate_match_percentage(jd_combined)
         if matches:
-            match_df = pd.DataFrame(matches).astype(str)
+            match_df = pd.DataFrame(matches)
+            match_df["Combined JD Keys"] = ', '.join(jd_combined)
+            match_df = match_df.astype(str)
             st.dataframe(match_df, use_container_width=True, height=300)
         else:
             st.info("No matching resumes found.")
