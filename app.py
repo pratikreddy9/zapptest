@@ -193,8 +193,8 @@ def main():
         st.metric(label="Total Job Descriptions", value=total_jds)
 
     # Uncomment the following lines to show duplicate count
-     total_duplicates = find_duplicate_resumes()
-     st.write(f"Number of duplicate resumes found: {total_duplicates}")
+      total_duplicates = find_duplicate_resumes()
+      st.write(f"Number of duplicate resumes found: {total_duplicates}")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
