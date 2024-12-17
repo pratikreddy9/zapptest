@@ -47,36 +47,64 @@ def load_css():
         unsafe_allow_html=True,
     )
 
-# Function to preprocess keywords
 def preprocess_keyword(keyword):
     """Preprocess a keyword by normalizing its format."""
-    keyword = keyword.casefold().strip()  # Lowercase and strip spaces
-    keyword = re.sub(r'[^\w\s]', '', keyword)  # Remove special characters
-    return ' '.join(sorted(keyword.split()))  # Sort multi-word phrases
+    keyword = keyword.casefold().strip()
+    keyword = re.sub(r'[^\w\s]', '', keyword)
+    return ' '.join(sorted(keyword.split()))
 
-# Function for fuzzy matching
 def fuzzy_match(keyword, target_keywords, threshold=80):
     """Perform fuzzy matching with a similarity threshold."""
     return any(fuzz.ratio(keyword, tk) >= threshold for tk in target_keywords)
 
-# Function to calculate keyword match percentage
+def find_duplicate_resumes():
+    """Find duplicate resumes based on email and phone number."""
+    duplicates = {}
+    all_resumes = list(resume_collection.find())
+    
+    # Group resumes by email and phone
+    for resume in all_resumes:
+        email = resume.get('email')
+        phone = resume.get('contactNo')
+        
+        # Create a key only if either email or phone is not None
+        if email or phone:
+            key = f"{email}_{phone}"
+            if key in duplicates:
+                duplicates[key].append(resume)
+            else:
+                duplicates[key] = [resume]
+    
+    # Filter out non-duplicates
+    duplicate_groups = {k: v for k, v in duplicates.items() if len(v) > 1}
+    total_duplicates = sum(len(group) - 1 for group in duplicate_groups.values())
+    
+    return total_duplicates
+
 def find_keyword_matches(jd_keywords, num_candidates=10):
     """Match resumes to job descriptions using keywords."""
     results = []
-    resumes = resume_collection.find().limit(num_candidates)
+    # Get unique resumes based on email and phone
+    seen_keys = set()
+    resumes = resume_collection.find().limit(num_candidates * 2)  # Fetch more to account for duplicates
 
-    # Preprocess JD keywords
     jd_keywords_normalized = [preprocess_keyword(keyword) for keyword in jd_keywords]
 
     for resume in resumes:
+        # Create a unique key based on email and phone
+        key = f"{resume.get('email')}_{resume.get('contactNo')}"
+        
+        # Skip if we've already seen this combination
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+
         resume_keywords = resume.get("keywords", [])
         if not resume_keywords:
             continue
 
-        # Preprocess resume keywords
         resume_keywords_normalized = [preprocess_keyword(keyword) for keyword in resume_keywords]
 
-        # Exact match and fuzzy match
         matching_keywords = [
             keyword for keyword in jd_keywords_normalized
             if any(preprocess_keyword(keyword) == rk or fuzzy_match(keyword, [rk]) for rk in resume_keywords_normalized)
@@ -95,20 +123,30 @@ def find_keyword_matches(jd_keywords, num_candidates=10):
             "Matching Keywords": matching_keywords
         })
 
-    # Return sorted results by match percentage
+        if len(results) >= num_candidates:
+            break
+
     return sorted(results, key=lambda x: x["Match Percentage (Keywords)"], reverse=True)
 
-# Function to calculate match percentages using cosine similarity
 def find_top_matches(jd_embedding, num_candidates=10):
+    """Find top matches using vector similarity."""
     results = []
-    resumes = resume_collection.find().limit(num_candidates)
+    seen_keys = set()
+    resumes = resume_collection.find().limit(num_candidates * 2)
 
     for resume in resumes:
+        # Create a unique key based on email and phone
+        key = f"{resume.get('email')}_{resume.get('contactNo')}"
+        
+        # Skip if we've already seen this combination
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+
         resume_embedding = resume.get("embedding")
         if not resume_embedding:
             continue
 
-        # Cosine similarity calculation
         dot_product = sum(a * b for a, b in zip(jd_embedding, resume_embedding))
         magnitude_jd = sum(a * a for a in jd_embedding) ** 0.5
         magnitude_resume = sum(b * b for b in resume_embedding) ** 0.5
@@ -116,7 +154,6 @@ def find_top_matches(jd_embedding, num_candidates=10):
             continue
         similarity_score = dot_product / (magnitude_jd * magnitude_resume)
 
-        # Convert similarity score to match percentage
         match_percentage = round(similarity_score * 100, 2)
 
         results.append({
@@ -125,10 +162,11 @@ def find_top_matches(jd_embedding, num_candidates=10):
             "Match Percentage (Vector)": match_percentage
         })
 
-    # Return sorted results by match percentage in descending order
+        if len(results) >= num_candidates:
+            break
+
     return sorted(results, key=lambda x: x["Match Percentage (Vector)"], reverse=True)
 
-# Function to display detailed resume information
 def display_resume_details(resume_id):
     resume = resume_collection.find_one({"resumeId": resume_id})
     if not resume:
@@ -142,7 +180,6 @@ def display_resume_details(resume_id):
     st.write(f"**Address:** {resume.get('address', 'N/A')}")
     st.markdown("---")
 
-# Main application logic
 def main():
     st.markdown("<div class='metrics-container'>", unsafe_allow_html=True)
 
@@ -155,9 +192,12 @@ def main():
     with col2:
         st.metric(label="Total Job Descriptions", value=total_jds)
 
+    # Uncomment the following lines to show duplicate count
+    # total_duplicates = find_duplicate_resumes()
+    # st.write(f"Number of duplicate resumes found: {total_duplicates}")
+
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # Search by Resume ID
     st.markdown("<div class='section-heading'>Search Candidate by Resume ID</div>", unsafe_allow_html=True)
     search_id = st.text_input("Enter Resume ID:")
     if st.button("Search"):
@@ -180,7 +220,6 @@ def main():
         st.write(f"**Job Description ID:** {selected_jd_id}")
         st.write(f"**Job Description:** {selected_jd_description}")
 
-        # Keyword Matching
         st.subheader("Top Matches (Keywords)")
         keyword_matches = find_keyword_matches(jd_keywords)
         if keyword_matches:
@@ -189,7 +228,6 @@ def main():
         else:
             st.info("No matching resumes found.")
 
-        # Vector Matching
         if jd_embedding:
             st.subheader("Top Matches (Vector Similarity)")
             vector_matches = find_top_matches(jd_embedding)
