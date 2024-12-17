@@ -81,7 +81,7 @@ def find_duplicate_resumes():
     
     return total_duplicates
 
-def find_keyword_matches(jd_keywords, num_candidates=10):
+def find_keyword_matches(jd_keywords, num_candidates=50):
     """Match resumes to job descriptions using keywords."""
     results = []
     # Get unique resumes based on email and phone
