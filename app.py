@@ -100,13 +100,13 @@ def main():
     st.sidebar.header("Navigation")
 
     # Load job descriptions
-    jd_list = jd_collection.find({})
+    jd_list = list(jd_collection.find({}))
     jd_options = [jd["title"] for jd in jd_list if "title" in jd]
 
     selected_jd_title = st.sidebar.selectbox("Select Job Description", jd_options)
 
     if selected_jd_title:
-        jd = jd_collection.find_one({"title": selected_jd_title})
+        jd = next((jd for jd in jd_list if jd["title"] == selected_jd_title), None)
         jd_keywords = jd.get("keywords", [])
         jd_embedding = jd.get("embedding")
 
