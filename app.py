@@ -84,7 +84,6 @@ def find_duplicate_resumes():
 def find_keyword_matches(jd_keywords, num_candidates=10):
     """Match resumes to job descriptions using keywords."""
     results = []
-    # Get unique resumes based on email and phone
     seen_keys = set()
     resumes = resume_collection.find().limit(num_candidates * 2)  # Fetch more to account for duplicates
 
@@ -116,11 +115,25 @@ def find_keyword_matches(jd_keywords, num_candidates=10):
             continue
         match_percentage = round((match_count / total_keywords) * 100, 2)
 
+        # Add new fields for the table
+        educational_qualifications = [
+            f"{edu.get('degree', 'N/A')} in {edu.get('field', 'N/A')}" 
+            for edu in resume.get("educationalQualifications", [])
+        ]
+        job_experiences = [
+            f"{job.get('title', 'N/A')} at {job.get('companyName', 'N/A')}" 
+            for job in resume.get("jobExperiences", [])
+        ]
+        keywords_list = ", ".join(resume_keywords)
+
         results.append({
             "Resume ID": resume.get("resumeId"),
             "Name": resume.get("name", "N/A"),
             "Match Percentage (Keywords)": match_percentage,
-            "Matching Keywords": matching_keywords
+            "Matching Keywords": matching_keywords,
+            "Educational Qualifications": "; ".join(educational_qualifications),
+            "Job Experiences": "; ".join(job_experiences),
+            "Keywords": keywords_list,
         })
 
         if len(results) >= num_candidates:
@@ -156,10 +169,24 @@ def find_top_matches(jd_embedding, num_candidates=10):
 
         match_percentage = round(similarity_score * 100, 2)
 
+        # Add new fields for the table
+        educational_qualifications = [
+            f"{edu.get('degree', 'N/A')} in {edu.get('field', 'N/A')}" 
+            for edu in resume.get("educationalQualifications", [])
+        ]
+        job_experiences = [
+            f"{job.get('title', 'N/A')} at {job.get('companyName', 'N/A')}" 
+            for job in resume.get("jobExperiences", [])
+        ]
+        keywords_list = ", ".join(resume.get("keywords", []))
+
         results.append({
             "Resume ID": resume.get("resumeId"),
             "Name": resume.get("name", "N/A"),
-            "Match Percentage (Vector)": match_percentage
+            "Match Percentage (Vector)": match_percentage,
+            "Educational Qualifications": "; ".join(educational_qualifications),
+            "Job Experiences": "; ".join(job_experiences),
+            "Keywords": keywords_list,
         })
 
         if len(results) >= num_candidates:
@@ -192,10 +219,6 @@ def main():
     with col2:
         st.metric(label="Total Job Descriptions", value=total_jds)
 
-    # Uncomment the following lines to show duplicate count
-    # total_duplicates = find_duplicate_resumes()
-    # st.write(f"Number of duplicate resumes found: {total_duplicates}")
-
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("<div class='section-heading'>Search Candidate by Resume ID</div>", unsafe_allow_html=True)
@@ -223,7 +246,7 @@ def main():
         st.subheader("Top Matches (Keywords)")
         keyword_matches = find_keyword_matches(jd_keywords)
         if keyword_matches:
-            keyword_match_df = pd.DataFrame(keyword_matches).drop(columns=["Final Score"], errors="ignore").astype(str)
+            keyword_match_df = pd.DataFrame(keyword_matches).astype(str)
             st.dataframe(keyword_match_df, use_container_width=True, height=300)
         else:
             st.info("No matching resumes found.")
