@@ -98,7 +98,7 @@ def find_keyword_matches(jd_keywords, num_candidates=50):
             continue
         seen_keys.add(key)
 
-        resume_keywords = resume.get("keywords", [])
+        resume_keywords = resume.get("keywords") or []
         if not resume_keywords:
             continue
 
@@ -116,24 +116,24 @@ def find_keyword_matches(jd_keywords, num_candidates=50):
         match_percentage = round((match_count / total_keywords) * 100, 2)
 
         # Add new fields for the table
-        educational_qualifications = [
-            f"{edu.get('degree', 'N/A')} in {edu.get('field', 'N/A')}" 
-            for edu in resume.get("educationalQualifications", [])
-        ]
+        skills = ", ".join(resume_keywords)
         job_experiences = [
             f"{job.get('title', 'N/A')} at {job.get('companyName', 'N/A')}" 
-            for job in resume.get("jobExperiences", [])
+            for job in resume.get("jobExperiences") or []
         ]
-        keywords_list = ", ".join(resume_keywords)
+        educational_qualifications = [
+            f"{edu.get('degree', 'N/A')} in {edu.get('field', 'N/A')}" 
+            for edu in resume.get("educationalQualifications") or []
+        ]
 
         results.append({
             "Resume ID": resume.get("resumeId"),
             "Name": resume.get("name", "N/A"),
             "Match Percentage (Keywords)": match_percentage,
             "Matching Keywords": matching_keywords,
-            "Educational Qualifications": "; ".join(educational_qualifications),
+            "Skills": skills,
             "Job Experiences": "; ".join(job_experiences),
-            "Keywords": keywords_list,
+            "Educational Qualifications": "; ".join(educational_qualifications),
         })
 
         if len(results) >= num_candidates:
@@ -170,23 +170,23 @@ def find_top_matches(jd_embedding, num_candidates=50):
         match_percentage = round(similarity_score * 100, 2)
 
         # Add new fields for the table
-        educational_qualifications = [
-            f"{edu.get('degree', 'N/A')} in {edu.get('field', 'N/A')}" 
-            for edu in resume.get("educationalQualifications", [])
-        ]
+        skills = ", ".join(resume.get("keywords") or [])
         job_experiences = [
             f"{job.get('title', 'N/A')} at {job.get('companyName', 'N/A')}" 
-            for job in resume.get("jobExperiences", [])
+            for job in resume.get("jobExperiences") or []
         ]
-        keywords_list = ", ".join(resume.get("keywords", []))
+        educational_qualifications = [
+            f"{edu.get('degree', 'N/A')} in {edu.get('field', 'N/A')}" 
+            for edu in resume.get("educationalQualifications") or []
+        ]
 
         results.append({
             "Resume ID": resume.get("resumeId"),
             "Name": resume.get("name", "N/A"),
             "Match Percentage (Vector)": match_percentage,
-            "Educational Qualifications": "; ".join(educational_qualifications),
+            "Skills": skills,
             "Job Experiences": "; ".join(job_experiences),
-            "Keywords": keywords_list,
+            "Educational Qualifications": "; ".join(educational_qualifications),
         })
 
         if len(results) >= num_candidates:
@@ -220,14 +220,6 @@ def main():
         st.metric(label="Total Job Descriptions", value=total_jds)
 
     st.markdown("</div>", unsafe_allow_html=True)
-
-    #st.markdown("<div class='section-heading'>Search Candidate by Resume ID</div>", unsafe_allow_html=True)
-    #search_id = st.text_input("Enter Resume ID:")
-    #if st.button("Search"):
-        #if search_id.strip():
-            #display_resume_details(search_id)
-        #else:
-            #st.warning("Please enter a valid Resume ID.")
 
     st.markdown("<div class='section-heading'>Select Job Description for Matching</div>", unsafe_allow_html=True)
     jds = list(jd_collection.find())
