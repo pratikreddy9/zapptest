@@ -221,13 +221,13 @@ def main():
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown("<div class='section-heading'>Search Candidate by Resume ID</div>", unsafe_allow_html=True)
-    search_id = st.text_input("Enter Resume ID:")
-    if st.button("Search"):
-        if search_id.strip():
-            display_resume_details(search_id)
-        else:
-            st.warning("Please enter a valid Resume ID.")
+    #st.markdown("<div class='section-heading'>Search Candidate by Resume ID</div>", unsafe_allow_html=True)
+    #search_id = st.text_input("Enter Resume ID:")
+    #if st.button("Search"):
+        #if search_id.strip():
+            #display_resume_details(search_id)
+        #else:
+            #st.warning("Please enter a valid Resume ID.")
 
     st.markdown("<div class='section-heading'>Select Job Description for Matching</div>", unsafe_allow_html=True)
     jds = list(jd_collection.find())
