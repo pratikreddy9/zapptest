@@ -65,10 +65,10 @@ def find_keyword_matches(jd_keywords):
     """
     Match resumes to job descriptions using keywords.
     """
-    total_resumes = resume_collection.count_documents({})
+    total_resumes = resume_collection.count_documents({"resumeId": {"$exists": True}})
     results = []
     seen_keys = set()
-    resumes = resume_collection.find().limit(total_resumes)  # Fetch all documents
+    resumes = resume_collection.find({"resumeId": {"$exists": True}}).limit(total_resumes)  # Fetch all valid documents
 
     jd_keywords_normalized = [preprocess_keyword(keyword) for keyword in jd_keywords]
 
@@ -106,10 +106,10 @@ def find_top_matches(jd_embedding):
     """
     Find top matches using vector similarity.
     """
-    total_resumes = resume_collection.count_documents({})
+    total_resumes = resume_collection.count_documents({"resumeId": {"$exists": True}})
     results = []
     seen_keys = set()
-    resumes = resume_collection.find().limit(total_resumes)
+    resumes = resume_collection.find({"resumeId": {"$exists": True}}).limit(total_resumes)
 
     for resume in resumes:
         key = f"{resume.get('email')}_{resume.get('contactNo')}"
@@ -136,8 +136,8 @@ def main():
     load_css()
 
     st.markdown("<div class='metrics-container'>", unsafe_allow_html=True)
-    total_resumes = resume_collection.count_documents({})
-    total_jds = jd_collection.count_documents({})
+    total_resumes = resume_collection.count_documents({"resumeId": {"$exists": True}})
+    total_jds = jd_collection.count_documents({"jobId": {"$exists": True}})
     col1, col2 = st.columns(2)
 
     with col1:
@@ -148,13 +148,22 @@ def main():
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("<div class='section-heading'>Select Job Description for Matching</div>", unsafe_allow_html=True)
-    jds = list(jd_collection.find())
+    jds = list(jd_collection.find({"jobId": {"$exists": True}}))
     jd_mapping = {jd.get("jobDescription", "N/A"): jd.get("jobId", "N/A") for jd in jds}
     selected_jd_description = st.selectbox("Select a Job Description:", list(jd_mapping.keys()))
 
     if selected_jd_description:
-        selected_jd_id = jd_mapping[selected_jd_description]
-        selected_jd = next(jd for jd in jds if jd.get("jobId") == selected_jd_id)
+        selected_jd_id = jd_mapping.get(selected_jd_description)
+        if not selected_jd_id:
+            st.error(f"Job Description ID not found for the selected description: {selected_jd_description}")
+            return
+
+        try:
+            selected_jd = next(jd for jd in jds if jd.get("jobId") == selected_jd_id)
+        except StopIteration:
+            st.error(f"Job Description with ID {selected_jd_id} not found in the database.")
+            return
+
         jd_keywords = selected_jd.get("structured_query", {}).get("keywords", [])
         jd_embedding = selected_jd.get("embedding")
 
